@@ -1,0 +1,122 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: marketten-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: marketten
+      MYSQL_USER: marketten
+      MYSQL_PASSWORD: marketten
+      MYSQL_ROOT_PASSWORD: marketten
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./docker/mysql-init:/docker-entrypoint-initdb.d 
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      retries: 5
+      timeout: 5s
+    networks:
+      - mkt_network
+
+  redis:
+    image: redis:6.2-alpine
+    container_name: marketten-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    networks:
+      - mkt_network
+
+  backend:
+    build:
+      context: marketten-backend
+      dockerfile: Dockerfile
+    container_name: marketten-backend
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      JWT_SECRET: ${JWT_SECRET}
+      UPLOAD_TYPE: ${UPLOAD_TYPE:-local}
+      SERVER_DOMAIN: ${DOMAIN_NAME}
+      FASTAPI_SERVER_URL: http://module:8000
+
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI}
+
+      NAVER_CLIENT_ID: ${NAVER_CLIENT_ID}
+      NAVER_CLIENT_SECRET: ${NAVER_CLIENT_SECRET}
+      NAVER_REDIRECT_URI: ${NAVER_REDIRECT_URI}
+
+      KAKAO_CLIENT_ID: ${KAKAO_CLIENT_ID}
+      KAKAO_CLIENT_SECRET: ${KAKAO_CLIENT_SECRET}
+      KAKAO_REDIRECT_URI: ${KAKAO_REDIRECT_URI}
+
+      SPRING_DATA_REDIS_HOST: ${REDIS_HOST}
+      SPRING_DATA_REDIS_PORT: ${REDIS_PORT}
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./uploads:/app/uploads
+      - /var/marketten/logs:/app/logs
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - mkt_network
+    restart: unless-stopped
+
+  module:
+    build:
+      context: marketten-module
+      dockerfile: Dockerfile
+    container_name: marketten-module
+    environment:
+      APP_NAME: marketten-module
+      APP_ENV: local
+      APP_DEBUG: true
+      APP_HOST: 0.0.0.0
+      CORS_ORIGINS: http://backend:8080,https://${DOMAIN_NAME}
+      CLIENT_ID: ${NAVER_DL_CLIENT_ID}
+      CLIENT_SECRET: ${NAVER_DL_CLIENT_SECRET}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+    ports:
+      - "8000:8000"
+    networks:
+      - mkt_network
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: marketten-frontend
+      dockerfile: Dockerfile
+    container_name: marketten-frontend
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      REACT_APP_API_URL: http://backend:8080
+      REACT_APP_FASTAPI_URL: http://module:8000
+    depends_on:
+      - backend
+      - module
+    networks:
+      - mkt_network
+    volumes:
+      # SSL 인증서 (Let's Encrypt)
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      # Nginx 설정파일
+      - ./marketten-frontend/nginx.conf:/etc/nginx/nginx.conf:ro
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
+    driver: local
+
+networks:
+  mkt_network:
+    driver: bridge

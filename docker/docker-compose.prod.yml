@@ -1,0 +1,79 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: gpt_mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-gpt_demo}
+      MYSQL_USER: ${MYSQL_USER:-gpt_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-gpt_password}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./mysql-init/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - gpt_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+      interval: 10s
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: gpt_backend
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - JWT_SECRET=${JWT_SECRET}
+      - UPLOAD_TYPE=${UPLOAD_TYPE:-local}
+    ports:
+      - "8080:8080"
+    volumes:
+      - /var/gpt-demo/uploads:/app/uploads
+      - /var/gpt-demo/logs:/app/logs
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - gpt_network
+    restart: unless-stopped
+
+  ai-module:
+    build:
+      context: ../ai-module
+      dockerfile: Dockerfile
+    container_name: gpt_ai_module
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ENVIRONMENT=production
+    ports:
+      - "8000:8000"
+    networks:
+      - gpt_network
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    container_name: gpt_frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - gpt_network
+    restart: unless-stopped
+
+# 볼륨 선언
+volumes:
+  mysql_data:
+    driver: local
+
+networks:
+  gpt_network:
+    driver: bridge
