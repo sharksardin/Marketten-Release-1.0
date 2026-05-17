@@ -1,0 +1,5 @@
+html {
+  height: 100%;
+  overflow-y: scroll;
+  scrollbar-gutter: stable; /* 스크롤바 공간을 항상 확보 */
+}

@@ -1,0 +1,32 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: InterVariable, sans-serif;
+  --color-indigo-950: oklch(98.7% 0.022 95.277);
+  --color-indigo-700: oklch(50.5% 0.213 27.518);
+  --color-indigo-600: oklch(50.5% 0.213 27.518);
+  --color-indigo-500: oklch(50.5% 0.213 27.518);
+}
+
+/* Scroll Snap CSS */
+.scroll-container {
+  height: 100%;
+  overflow-y: scroll;
+  scroll-snap-type: y mandatory;
+}
+
+.scroll-section {
+  scroll-snap-align: start;
+}
+
+@font-face {
+  font-family: 'GyeonggiMillenniumTitle';
+  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/2410-3@1.0/Title_Light.woff')
+    format('woff');
+  font-weight: 300;
+  font-display: swap;
+}
+
+.font-hobbang {
+  font-family: 'GyeonggiMillenniumTitle', sans-serif;
+}
